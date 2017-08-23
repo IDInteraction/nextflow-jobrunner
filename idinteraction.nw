@@ -111,20 +111,26 @@ process map_frame {
 }
 */
 
-videofiles = frontkinectfile.merge(webcamfile){f, w -> [f, w] }
+// Combine both video sources
+videofiles = frontkinectfile.mix(webcamfile)
 
-
+// Combine all combinations of startevents and video sources
+cppmt_runs = videofiles.combine(startevents)
+// Run them
 process run_cppmt {
 	input:
-	set val(event), val(eventframe) from startevents
-	file videofile from videofiles
+	set val(event), val(eventframe) ,
+val(participantcode), file(videofile), val(timebase),
+		val(source) from cppmt_runs
 	
 	output:
-	file "cppmt_tracking.csv" into cppmttrackingfile
-	stdout results
+	set participantcode, "cppmt_tracking.csv", timebase, source into cppmttrackingfile
 
 	"""
 	echo "Running cppmt tracking"
+	echo "${videofile} ${event} ${eventframe}"
+	echo "${participantcode}, ${timebase}"
+	echo "${event}, ${eventframe}"
 	echo "Cppmt tracking" > cppmt_tracking.csv
 	cat ${videofile} >> cppmt_tracking
 	echo ${event} >> cppmt_tracking
@@ -132,4 +138,15 @@ process run_cppmt {
 	"""
 }
 
-results.subscribe{ println it}
+process report_cppmt {
+	input: 
+	set val(participantcode), file("cppmttrack.csv"),
+	val(timebase), val(source) from cppmttrackingfile
+
+	exec:
+	println participantcode
+	println timebase
+	println source
+
+}
+
