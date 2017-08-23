@@ -7,6 +7,7 @@ vim: syntax=groovy
 
 
 params.indir = "./participants/*"
+params.eventfile = "./particiants/transitionannotations.csv"
 params.manuscript = "manuscript.pdf"
 
 /* How we handle the processing of, e.g. the Kinect data is going
@@ -26,74 +27,109 @@ Ground truth data
 /* Will need to make a single participant's data flow through several
 channels - e.g. each video stream, etc */
 
-participant_dir = Channel.fromPath(params.indir, type: 'dir')
-
-process enter_participant {
-
-	input:
-	file participantpart from participant_dir
-
-	output:
-	val participant into participantdir
-
-	exec:
-	participantpart.eachFileRecurse(){
-		println "Found $it"
-		participant = it
+participant_dir = Channel.fromPath(params.indir, type: 'dir').map {
+	path -> tuple(path.baseName, 
+			path.toRealPath(),
+			 path)
 	}
 
-}
+keyframefile = Channel.fromPath(params.eventfile)
+
+eventnames = Channel.from ("start1",
+			"end1",
+			"start2",
+			"end2")
 
 
-process split_participant {
-
-	input:
-	val participant from participantdir
+process enter_participant {
+	input: 
+	set participantcode, fullpath, path from participant_dir
 
 	output:
-	val attention into attentionfile
-	val kinect into kinectfile
+	set participantcode, 'attention.txt' into attentionfile
+	set participantcode, 'frontkinect.mp4', val("kinect"),
+		val("front")  into frontkinectfile
+	set participantcode, 'webcam.mp4', val("webcam"), val("front")  into webcamfile
+	set participantcode, 'depthdata.tar' into depthfile
 
-	exec:
-		participant.eachFileRecurse(){
-			filepath = it.getFileName()
-			println "Split participant $filepath"
-/*
-			if (it.toString() ==~ /_attention\.txt/){
-				println "Found attention"
-				attention = participantpart
-			} else if (it.toString() ==~ /_kinect\.mp4/){
-				println "Found kinect"
-				kinect = participantpart
-			}
-*/
-		}
+	"""
+	# TODO - check each only matches a single file
+	cat ${fullpath}/*_attention.txt > attention.txt
+	cat ${fullpath}/*_kinect.mp4 > frontkinect.mp4
+	cat ${fullpath}/*_webcam.mp4 > webcam.mp4
+	tar czf depthdata.tar ${fullpath}/P??depth/*
+	"""
 }
 
-process processattention {
+attentionfile.into {attention_for_groundtruth; attention_for_events}
+
+process attention_to_groundtruth {
+	input:
+	set val(participantcode), file(attentionfile) from attention_for_groundtruth
+
+	output:
+	file 'groundtruth.csv' into csvfile
+
+	"""
+	echo "groundtruth" > groundtruth.csv
+	cat  ${attentionfile} >> groundtruth.csv
+	"""
+}
+
+process extract_eventframe {
+	input:
+	file attentionfile from attention_for_events
+	file keyframefile from keyframefile
+	val event from eventnames
+
+	output:
+	set val(event), val(eventframe) into eventframe
 	
-	input:
-	file theattentionfile from attentionfile
-
-	output:
-	stdout attentionout
-
-	script:
-	"""
-	echo "Processing attentionfile"
-	echo ${theattentionfile}
-	"""
+	exec:
+	eventframe = "123"
 
 }
 
+// Split channel so we can use it in following two filters
+eventframe.into {eventframe1; eventframe2}
+startevents = eventframe1.filter {it[0] =~/^start./}
+endevents = eventframe2.filter{it[0] =~/^end./}
+
 /*
-attentionfile.subscribe {
-	println "Attention:"
-	println it.trim()
+process map_frame {
+	// Transform a frame from Kinect to Webcam time 
+	input:
+	val kinectframe from kinectframe
+	val participant from participant
+	val map from mappingfile // Not sure how we'll implement this
+
+	output:
+	val webcamframe from eventframe
+	
+	exec:
+	// Stuff to do the mapping
 }
 */
 
-kinectfile.subscribe {
-	println "Kinect:"
-	println it.trim()
+videofiles = frontkinectfile.merge(webcamfile){f, w -> [f, w] }
+
+
+process run_cppmt {
+	input:
+	set val(event), val(eventframe) from startevents
+	file videofile from videofiles
+	
+	output:
+	file "cppmt_tracking.csv" into cppmttrackingfile
+	stdout results
+
+	"""
+	echo "Running cppmt tracking"
+	echo "Cppmt tracking" > cppmt_tracking.csv
+	cat ${videofile} >> cppmt_tracking
+	echo ${event} >> cppmt_tracking
+	echo ${eventframe} >> cppmt_tracking
+	"""
 }
+
+results.subscribe{ println it}
