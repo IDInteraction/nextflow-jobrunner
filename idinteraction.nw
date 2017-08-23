@@ -1,0 +1,99 @@
+#!/usr/bin/env nextflow
+
+/*
+vim: syntax=groovy
+-*- mode: groovy;-*-
+*/
+
+
+params.indir = "./participants/*"
+params.manuscript = "manuscript.pdf"
+
+/* How we handle the processing of, e.g. the Kinect data is going
+to be tricky.  Make placeholder jobs, that just check for existance of
+files/directories? */
+
+/* A participant's data consists of:
+webcam video
+kinect front video
+kinect side video
+Series of frames for front depth
+Series of frames for side depth
+Ground truth data
+*/
+
+
+/* Will need to make a single participant's data flow through several
+channels - e.g. each video stream, etc */
+
+participant_dir = Channel.fromPath(params.indir, type: 'dir')
+
+process enter_participant {
+
+	input:
+	file participantpart from participant_dir
+
+	output:
+	val participant into participantdir
+
+	exec:
+	participantpart.eachFileRecurse(){
+		println "Found $it"
+		participant = it
+	}
+
+}
+
+
+process split_participant {
+
+	input:
+	val participant from participantdir
+
+	output:
+	val attention into attentionfile
+	val kinect into kinectfile
+
+	exec:
+		participant.eachFileRecurse(){
+			filepath = it.getFileName()
+			println "Split participant $filepath"
+/*
+			if (it.toString() ==~ /_attention\.txt/){
+				println "Found attention"
+				attention = participantpart
+			} else if (it.toString() ==~ /_kinect\.mp4/){
+				println "Found kinect"
+				kinect = participantpart
+			}
+*/
+		}
+}
+
+process processattention {
+	
+	input:
+	file theattentionfile from attentionfile
+
+	output:
+	stdout attentionout
+
+	script:
+	"""
+	echo "Processing attentionfile"
+	echo ${theattentionfile}
+	"""
+
+}
+
+/*
+attentionfile.subscribe {
+	println "Attention:"
+	println it.trim()
+}
+*/
+
+kinectfile.subscribe {
+	println "Kinect:"
+	println it.trim()
+}
