@@ -29,8 +29,10 @@ process runClassifier {
 	output:
 	file 'classifierresult.txt' into classres
 
+	// abc-classify.py **must** be in the search path
 	"""
-	./abc-classify.py --outfile=classifierresult.txt  ${participant}
+	pwd
+	abc-classify.py --outfile=classifierresult.txt  ${participant}
 	"""
 }
 
