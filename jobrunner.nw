@@ -12,7 +12,8 @@ vim: syntax=groovy
 params.outfile="outfile.csv"
 
 experimentparts=[1,2]
-
+trainingframes=[30,60,120,240,450,900,1800]
+shuffleoptions=["","no"]
 participantrange = 1..20
 participantcode = participantrange.collect{"P" + String.valueOf(it).padLeft(2,'0')}
 participants=Channel.from(participantcode) // Want to detect automatically
@@ -29,9 +30,11 @@ process runClassifier {
 	input:
 	val participant from participants
 	each experimentpart from experimentparts
+	each trainingframe from trainingframes
+	each shuffle from shuffleoptions
 
 	output:
-	file "result${participant}${experimentpart}.txt" into classres
+	file "result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt" into classres
 
 	exec:
 	openface = openfacesource[0] + "$participant" + openfacesource[2]
@@ -39,12 +42,11 @@ process runClassifier {
 	startstring = "start" + "$experimentpart"
 	endstring = "end" + "$experimentpart"
 
-
 	shell:
 	// provide a comma separated list of tracking source data to the
 	// --tracker option
 	"""
-	abc-classify.py --outfile=result${participant}${experimentpart}.txt  --tracker ${openface} --startframestring ${startstring} ${endstring}
+	abc-classify.py --outfile=result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt  --tracker ${openface} --startframestring ${startstring} --endframestring=${endstring} --${shuffle}shuffle
 	"""
 }
 
