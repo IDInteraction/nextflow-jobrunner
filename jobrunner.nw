@@ -10,17 +10,14 @@ vim: syntax=groovy
 
 
 params.outfile="outfile.csv"
+params.sources="openface,cppmt"
 
 experimentparts=[1,2]
 trainingframes=[30,60,120,240,450,900,1800]
 shuffleoptions=["","no"]
-participantrange = 1..20
+participantrange = 1..20 // Want to detect automatically (pass as environment var?)
 participantcode = participantrange.collect{"P" + String.valueOf(it).padLeft(2,'0')}
-participants=Channel.from(participantcode) // Want to detect automatically
-
-openfacesource = ["openface/", "xx", "_front.openface"]
-
-groundtruthsource = "attention/xx_groundtruth.csv"
+participants=Channel.from(participantcode) 
 
 
 
@@ -37,7 +34,22 @@ process runClassifier {
 	file "result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt" into classres
 
 	exec:
-	openface = openfacesource[0] + "$participant" + openfacesource[2]
+	sources = ["cppmt":"/idinteraction/results/cppMT/part${experimentpart}/${participant}_front.csv",
+	"pca":"/idinteraction/results/depth/${participant}.pca${experimentpart}",
+	"mixture":"/idinteraction/results/depth/${participant}.mixture${experimentpart}",
+	"openface":"/idinteraction/results/OpenFace/${participant}_front.openface"]
+
+	// Derive the string we need to pass as --tracker parameters
+	sourcelist = params.sources.tokenize(",")
+	String sourcestring = ""
+	for (String s : sourcelist){
+		thissource = sources[s]
+		if (!thissource){
+			throw new IOException("No frame source " + thissource)
+		}
+		sourcestring += ("--tracker " + thissource + " ")
+	}
+
 	// Include strings for other data sources in here
 	startstring = "start" + "$experimentpart"
 	endstring = "end" + "$experimentpart"
@@ -46,12 +58,15 @@ process runClassifier {
 	// provide a comma separated list of tracking source data to the
 	// --tracker option
 	"""
-	abc-classify.py --outfile=result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt  --tracker ${openface} --startframestring ${startstring} --endframestring=${endstring} --${shuffle}shuffle
+	abc-classify.py --outfile=result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt  ${sourcestring} --startframestring ${startstring} --endframestring=${endstring} --${shuffle}shuffle
 	"""
 }
 
 process produceOutput {
 	// Combine the results of each individual run
+
+	publishDir "data/runresults", mode:"copy" , overwrite:"false"
+
 	input:
 	file classreslist from classres.collect()
 
