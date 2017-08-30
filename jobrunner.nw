@@ -1,0 +1,37 @@
+#!/usr/bin/env nextflow
+/* Run IDInteraction analysis jobs (i.e. classifying from ground truth
+and arbitrary sources of tracking data) using Nextflow */
+/* August 2017 */
+
+/*
+vim: syntax=groovy
+-*- mode: groovy;-*-
+*/
+
+
+params.outfile="outfile.csv"
+
+experimentparts=[1,2]
+participantrange = 1..20
+participantcode = participantrange.collect{"P" + String.valueOf(it).padLeft(2,'0')}
+participants=Channel.from(participantcode) // Want to detect automatically
+
+openfacesource = ["openface/", "xx", "_front.openface"]
+
+groundtruthsource = "attention/xx_groundtruth.csv"
+
+
+
+process runClassifier {
+	input:
+	val participant from participants
+
+	output:
+	file 'classifierresult.txt' into classres
+
+	"""
+	./abc-classify.py --outfile=classifierresult.txt  ${participant}
+	"""
+}
+
+
