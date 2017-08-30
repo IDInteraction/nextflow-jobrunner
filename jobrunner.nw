@@ -24,24 +24,43 @@ groundtruthsource = "attention/xx_groundtruth.csv"
 
 
 process runClassifier {
+
+	// Run the classifier for a participant/experimentpart combination
 	input:
 	val participant from participants
 	each experimentpart from experimentparts
 
 	output:
-	file 'classifierresult.txt' into classres
+	file "result${participant}${experimentpart}.txt" into classres
 
 	exec:
 	openface = openfacesource[0] + "$participant" + openfacesource[2]
+	// Include strings for other data sources in here
 	startstring = "start" + "$experimentpart"
 	endstring = "end" + "$experimentpart"
 
 
 	shell:
-	// abc-classify.py **must** be in the search path
+	// provide a comma separated list of tracking source data to the
+	// --tracker option
 	"""
-	abc-classify.py --outfile=classifierresult.txt  --tracker ${openface} --startframestring ${startstring} ${endstring}
+	abc-classify.py --outfile=result${participant}${experimentpart}.txt  --tracker ${openface} --startframestring ${startstring} ${endstring}
 	"""
 }
 
+process produceOutput {
+	// Combine the results of each individual run
+	input:
+	file classreslist from classres.collect()
 
+	output:
+	file 'runresults.txt' 
+
+	script:
+	"""
+	for resfile in ${classreslist}
+	do
+		cat \$resfile >> runresults.txt
+	done
+	"""
+}
