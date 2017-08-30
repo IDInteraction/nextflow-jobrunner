@@ -29,10 +29,14 @@ process runClassifier {
 	output:
 	file 'classifierresult.txt' into classres
 
+	exec:
+	openface = openfacesource[0] + "$participant" + openfacesource[2]
+
+	shell:
 	// abc-classify.py **must** be in the search path
 	"""
 	pwd
-	abc-classify.py --outfile=classifierresult.txt  ${participant}
+	abc-classify.py --outfile=classifierresult.txt  --tracker ${openface}
 	"""
 }
 
