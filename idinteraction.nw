@@ -5,27 +5,10 @@ vim: syntax=groovy
 -*- mode: groovy;-*-
 */
 
+// Experimental processing pipeline for idinteraction using nextflow
 
 params.indir = "./participants/*"
 params.eventfile = "./particiants/transitionannotations.csv"
-params.manuscript = "manuscript.pdf"
-
-/* How we handle the processing of, e.g. the Kinect data is going
-to be tricky.  Make placeholder jobs, that just check for existance of
-files/directories? */
-
-/* A participant's data consists of:
-webcam video
-kinect front video
-kinect side video
-Series of frames for front depth
-Series of frames for side depth
-Ground truth data
-*/
-
-
-/* Will need to make a single participant's data flow through several
-channels - e.g. each video stream, etc */
 
 participant_dir = Channel.fromPath(params.indir, type: 'dir').map {
 	path -> tuple(path.baseName, 
@@ -40,13 +23,14 @@ eventnames = Channel.from ("start1",
 			"start2",
 			"end2")
 
-
 process enter_participant {
+	// Separate each participant's data into its constituent 
+	// streams
 	input: 
 	set participantcode, fullpath, path from participant_dir
 
 	output:
-	set participantcode, 'attention.txt' into attentionfile
+	set participantcode, 'attention.txt' into attention_for_groundtruth, attention_for_events
 	set participantcode, 'frontkinect.mp4', val("kinect"),
 		val("front")  into frontkinectfile
 	set participantcode, 'webcam.mp4', val("webcam"), val("front")  into webcamfile
@@ -61,18 +45,19 @@ process enter_participant {
 	"""
 }
 
-attentionfile.into {attention_for_groundtruth; attention_for_events}
 
 process attention_to_groundtruth {
+	// Convert an attention file to a groundtruth file
 	input:
 	set val(participantcode), file(attentionfile) from attention_for_groundtruth
 
 	output:
-	file 'groundtruth.csv' into csvfile
+	set file('groundtruth.csv'), val(participantcode) into csvfile
 
 	"""
 	echo "groundtruth" > groundtruth.csv
 	cat  ${attentionfile} >> groundtruth.csv
+	
 	"""
 }
 
@@ -96,11 +81,10 @@ startevents = eventframe1.filter {it[0] =~/^start./}
 endevents = eventframe2.filter{it[0] =~/^end./}
 
 /*
-process map_frame {
-	// Transform a frame from Kinect to Webcam time 
+process map_frame_to_kinect {
+	// Transform a frame from Webcam to Kinect time 
 	input:
-	val kinectframe from kinectframe
-	val participant from participant
+	set val(webcamframe), val(event), val(participantcode) from xxx
 	val map from mappingfile // Not sure how we'll implement this
 
 	output:
@@ -116,8 +100,10 @@ videofiles = frontkinectfile.mix(webcamfile)
 
 // Combine all combinations of startevents and video sources
 cppmt_runs = videofiles.combine(startevents)
+
 // Run them
 process run_cppmt {
+	echo true
 	input:
 	set val(event), val(eventframe) ,
 val(participantcode), file(videofile), val(timebase),
@@ -132,6 +118,7 @@ val(participantcode), file(videofile), val(timebase),
 	echo "${participantcode}, ${timebase}"
 	echo "${event}, ${eventframe}"
 	echo "Cppmt tracking" > cppmt_tracking.csv
+	echo ${participantcode} >> cppmt_tracking
 	cat ${videofile} >> cppmt_tracking
 	echo ${event} >> cppmt_tracking
 	echo ${eventframe} >> cppmt_tracking
@@ -144,9 +131,12 @@ process report_cppmt {
 	val(timebase), val(source) from cppmttrackingfile
 
 	exec:
-	println participantcode
+	println "in report_cppmt"
+	println "pcode:" + participantcode
 	println timebase
 	println source
+	println "end report_cppmt"
 
 }
+
 
