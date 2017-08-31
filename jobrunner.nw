@@ -14,18 +14,13 @@ params.sources="openface,cppmt"
 params.includeframefortracking=false
 params.targetted=false
 experimentparts=[1,2]
-//trainingframes=[30,60,120,240,450,900,1800]
-trainingframes = [30]
+trainingframes=[30,60,120,240,450,900,1800]
 shuffleoptions=["","no"]
-//participantrange = 1..20 // Want to detect automatically (pass as environment var?)
-participantrange = 1..2
+participantrange = 1..20 // Want to detect automatically (pass as environment var?)
 participantcode = participantrange.collect{"P" + String.valueOf(it).padLeft(2,'0')}
 participants=Channel.from(participantcode) 
 
-
-
 process runClassifier {
-	echo true
 	// Run the classifier for a participant/experimentpart combination
 	input:
 	val participant from participants
@@ -44,7 +39,9 @@ process runClassifier {
 	sources = ["cppmt":"/idinteraction/results/cppMT/part${experimentpart}/${participant}_front.csv",
 	"pca":"/idinteraction/results/depth/${participant}.pca${experimentpart}",
 	"mixture":"/idinteraction/results/depth/${participant}.mixture${experimentpart}",
-	"openface":"/idinteraction/results/OpenFace/${participant}_front.openface"]
+	"openface":"/idinteraction/results/OpenFace/${participant}_front.openface",
+	"mixtureside":"/idinteraction/results/depth_side/${participant}.mixture${experimentpart}",
+	"pcaside": "/idinteraction/results/depth_side/${participant}.pca${experimentpart}"]
 
 	// Derive the string we need to pass as --tracker parameters
 	sourcelist = params.sources.tokenize(",")
@@ -87,13 +84,13 @@ process produceOutput {
 	file classreslist from classres.collect()
 
 	output:
-	file 'runresults.txt' 
+	file '*.csv' 
 
 	script:
 	"""
 	for resfile in ${classreslist}
 	do
-		cat \$resfile >> runresults.txt
+		cat \$resfile >> ${params.outfile} 
 	done
 	"""
 }
