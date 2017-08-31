@@ -71,7 +71,7 @@ process runClassifier {
 	shell:
 	// ${PWD##*/} gets the last part of the current directory
 	"""
-	abc-classify.py --outfile=result\${PWD##*/}.csv  ${sourcestring} --startframestring ${startstring} --endframestring=${endstring} --${shuffle}shuffle ${includeframefortracking} ${targetted} --workdir ${workflow.launchDir}
+	abc-classify.py  --${shuffle}shuffle --externaltrainingframes ${trainingframe} ${sourcestring} --summaryfile result\${PWD##*/}.csv --startframe \$(cat /idinteraction/results/EventFrames/${participant}_attention.${startstring}) --endframe \$(cat /idinteraction/results/EventFrames/${participant}_attention.${endstring})   --extgt /idinteraction/results/Groundtruth/${participant}_attention.csv --useexternalgt  --maxmissing 600  --participantcode a:${experimentpart}::f:${trainingframe}::p:${participant}::s:${shuffle}
 	"""
 }
 
