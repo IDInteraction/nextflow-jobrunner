@@ -12,6 +12,7 @@ vim: syntax=groovy
 params.outfile="outfile.csv"
 params.sources="openface,cppmt"
 params.includeframefortracking=false
+params.targetted=false
 experimentparts=[1,2]
 //trainingframes=[30,60,120,240,450,900,1800]
 trainingframes = [30]
@@ -33,6 +34,11 @@ process runClassifier {
 	each shuffle from shuffleoptions
 
 	output:
+	// We need each output filename to be unique.  Idealy we'd do 
+	// this by introspection and using the processID(?) - i.e. the working
+	// directory for this _process_
+	// At the moment we concatenate the input parameters, but this 
+	// isn't very scalable
 	file "result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt" into classres
 
 	exec:
@@ -56,14 +62,19 @@ process runClassifier {
 	if (params.includeframefortracking){
 		includeframefortracking = "--includeframefortracking"
 	}
+
+	targetted = " "
+	if(params.targetted){
+		targetted = "--targetted --windowsize 1000 --advancesize 500 --batchsize 50"
+	}
+
 	groundtruth = "/idinteraction/results/Groundtruth/${participant}_attention.csv"
 
 	startstring = "start" + "$experimentpart"
 	endstring = "end" + "$experimentpart"
-
 	shell:
 	"""
-	abc-classify.py --outfile=result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt  ${sourcestring} --startframestring ${startstring} --endframestring=${endstring} --${shuffle}shuffle ${includeframefortracking}
+	abc-classify.py --outfile=result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt  ${sourcestring} --startframestring ${startstring} --endframestring=${endstring} --${shuffle}shuffle ${includeframefortracking} ${targetted} --workdir ${workflow.launchDir}
 	"""
 }
 
