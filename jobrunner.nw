@@ -34,12 +34,11 @@ process runClassifier {
 	each shuffle from shuffleoptions
 
 	output:
-	// We need each output filename to be unique.  Idealy we'd do 
-	// this by introspection and using the processID(?) - i.e. the working
-	// directory for this _process_
-	// At the moment we concatenate the input parameters, but this 
-	// isn't very scalable
-	file "result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt" into classres
+	// We need each output filename to be unique. 
+	// We do this by getting the directory name we run in in the 
+	// shell script
+	
+	file "result*.csv" into classres
 
 	exec:
 	sources = ["cppmt":"/idinteraction/results/cppMT/part${experimentpart}/${participant}_front.csv",
@@ -73,8 +72,9 @@ process runClassifier {
 	startstring = "start" + "$experimentpart"
 	endstring = "end" + "$experimentpart"
 	shell:
+	// ${PWD##*/} gets the last part of the current directory
 	"""
-	abc-classify.py --outfile=result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt  ${sourcestring} --startframestring ${startstring} --endframestring=${endstring} --${shuffle}shuffle ${includeframefortracking} ${targetted} --workdir ${workflow.launchDir}
+	abc-classify.py --outfile=result\${PWD##*/}.csv  ${sourcestring} --startframestring ${startstring} --endframestring=${endstring} --${shuffle}shuffle ${includeframefortracking} ${targetted} --workdir ${workflow.launchDir}
 	"""
 }
 
