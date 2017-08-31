@@ -14,8 +14,8 @@ params.sources="openface,cppmt"
 params.includeframefortracking=false
 params.targetted=false
 experimentparts=[1,2]
+shuffleoptions = ["","no"]
 trainingframes=[30,60,120,240,450,900,1800]
-shuffleoptions=["","no"]
 participantrange = 1..20 // Want to detect automatically (pass as environment var?)
 participantcode = participantrange.collect{"P" + String.valueOf(it).padLeft(2,'0')}
 participants=Channel.from(participantcode) 
@@ -60,18 +60,25 @@ process runClassifier {
 	}
 
 	targetted = " "
+	shufflecode = shuffle
 	if(params.targetted){
 		targetted = "--targetted --windowsize 1000 --advancesize 500 --batchsize 50"
+		shufflecode="targetted"	
 	}
 
 	groundtruth = "/idinteraction/results/Groundtruth/${participant}_attention.csv"
 
 	startstring = "start" + "$experimentpart"
 	endstring = "end" + "$experimentpart"
+
+	// Only run for shuffled when doing targetted training
+	when:
+	!params.targetted || (params.targetted && shuffle=="")
+
 	shell:
 	// ${PWD##*/} gets the last part of the current directory
 	"""
-	abc-classify.py  --${shuffle}shuffle --externaltrainingframes ${trainingframe} ${sourcestring} --summaryfile result\${PWD##*/}.csv --startframe \$(cat /idinteraction/results/EventFrames/${participant}_attention.${startstring}) --endframe \$(cat /idinteraction/results/EventFrames/${participant}_attention.${endstring})   --extgt /idinteraction/results/Groundtruth/${participant}_attention.csv --useexternalgt  --maxmissing 600  --participantcode a:${experimentpart}::f:${trainingframe}::p:${participant}::s:${shuffle}
+	abc-classify.py  --${shuffle}shuffle --externaltrainingframes ${trainingframe} ${sourcestring} --summaryfile result\${PWD##*/}.csv --startframe \$(cat /idinteraction/results/EventFrames/${participant}_attention.${startstring}) --endframe \$(cat /idinteraction/results/EventFrames/${participant}_attention.${endstring})   --extgt /idinteraction/results/Groundtruth/${participant}_attention.csv --useexternalgt  --maxmissing 600  --participantcode a:${experimentpart}::f:${trainingframe}::p:${participant}::s:${shufflecode}
 	"""
 }
 
