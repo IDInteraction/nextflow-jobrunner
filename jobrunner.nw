@@ -11,18 +11,20 @@ vim: syntax=groovy
 
 params.outfile="outfile.csv"
 params.sources="openface,cppmt"
-
+params.includeframefortracking=false
 experimentparts=[1,2]
-trainingframes=[30,60,120,240,450,900,1800]
+//trainingframes=[30,60,120,240,450,900,1800]
+trainingframes = [30]
 shuffleoptions=["","no"]
-participantrange = 1..20 // Want to detect automatically (pass as environment var?)
+//participantrange = 1..20 // Want to detect automatically (pass as environment var?)
+participantrange = 1..2
 participantcode = participantrange.collect{"P" + String.valueOf(it).padLeft(2,'0')}
 participants=Channel.from(participantcode) 
 
 
 
 process runClassifier {
-
+	echo true
 	// Run the classifier for a participant/experimentpart combination
 	input:
 	val participant from participants
@@ -50,15 +52,18 @@ process runClassifier {
 		sourcestring += ("--tracker " + thissource + " ")
 	}
 
-	// Include strings for other data sources in here
+	includeframefortracking = " "
+	if (params.includeframefortracking){
+		includeframefortracking = "--includeframefortracking"
+	}
+	groundtruth = "/idinteraction/results/Groundtruth/${participant}_attention.csv"
+
 	startstring = "start" + "$experimentpart"
 	endstring = "end" + "$experimentpart"
 
 	shell:
-	// provide a comma separated list of tracking source data to the
-	// --tracker option
 	"""
-	abc-classify.py --outfile=result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt  ${sourcestring} --startframestring ${startstring} --endframestring=${endstring} --${shuffle}shuffle
+	abc-classify.py --outfile=result${participant}_${experimentpart}_${trainingframe}_${shuffle}.txt  ${sourcestring} --startframestring ${startstring} --endframestring=${endstring} --${shuffle}shuffle ${includeframefortracking}
 	"""
 }
 
